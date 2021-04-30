@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+notebook = "*"
+matplotlib = "*"
+midi = {git = "https://github.com/louisabraham/python3-midi"}
+tensorflow-probability = "*"
+pydot = "*"
+tensorflow-gpu = "*"
+tensorflow-addons = "*"
+plotly = "*"
+ipywidgets = "*"
+pandas = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8"
