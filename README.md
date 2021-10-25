@@ -64,22 +64,22 @@ generating-music-tf-2
 │   └───midi 
 |   |   |   
 |   |   └───train                    <- .mid files generated during training
-|   |   |   |    < model_name >.mid            
+|   |   |   └─── < model_name >            
 |   |   |   
 |   |   └───generated                <- .mid files generated after training
-|   |   |   |    < model_name >.mid            
+|   |   |   └─── < model_name >             
 |   |   
 |   |   └───results                  <- Renamed and collected 
 |   |   |   |                           .mid files based on data used for model
-|   |   |   |    < model_name >.mid            
+|   |   |   └─── < model_name >            
 |   |   
 │   └───models
 |   |   |   
 |   |   └───arrays                   <- numpy arrays saved after training
-|   |   |   |    < model_name >.mid            
+|   |   |   └─── < model_name >            
 |   |   |   
 |   |   └───ckpt                     <- saved models during and after training
-|   |   |   |    < model_name >.mid            
+|   |   |   └─── < model_name >            
 
 ```
 
