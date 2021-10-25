@@ -11,7 +11,7 @@ from tensorflow.python.keras.utils import losses_utils
 from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
 from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
 from tensorflow_addons.metrics import MeanMetricWrapper
-
+import pdb
 
 class BatchReshape(Layer):
     
@@ -141,7 +141,7 @@ class CustomSigmoidFocalCrossEntropy(LossFunctionWrapper):
         from_logits: bool = False,
         alpha: FloatTensorLike = 0.25,
         gamma: FloatTensorLike = 2.0,
-        reduction: str = tf.keras.losses.Reduction.NONE,
+        reduction: str = losses_utils.ReductionV2.NONE,
         name: str = "sigmoid_focal_crossentropy",
     ):
         super().__init__(
@@ -176,30 +176,31 @@ def custom_sigmoid_focal_crossentropy(
     ce = tf.stack([ce_p, ce_a], axis=-1)
 
     # If logits are provided then convert the predictions into probabilities
-    if from_logits:
-        pred_prob = tf.sigmoid(y_pred)
-    else:
-        pred_prob = y_pred
+    # if from_logits:
+    #     pred_prob = tf.sigmoid(y_pred)
+    # else:
+    #     pred_prob = y_pred
 
     # if note is not played, mask out probability for articulation   
-    pred_prob_p = pred_prob[:,:,:,0]
-    pred_prob_a = pred_prob[:,:,:,1] * y_true[:,:,:,0] 
-    pred_prob = tf.stack([pred_prob_p, pred_prob_a], axis=-1)
+    # pred_prob_p = pred_prob[:,:,:,0]
+    # pred_prob_a = pred_prob[:,:,:,1] * y_true[:,:,:,0] 
+    # pred_prob = tf.stack([pred_prob_p, pred_prob_a], axis=-1)
 
-    p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
+    # p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
     alpha_factor = 1.0
     modulating_factor = 1.0
 
-    if alpha:
-        alpha = tf.convert_to_tensor(alpha, dtype=K.floatx())
-        alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
+    # if alpha:
+    #     alpha = tf.convert_to_tensor(alpha, dtype=K.floatx())
+    #     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
 
-    if gamma:
-        gamma = tf.convert_to_tensor(gamma, dtype=K.floatx())
-        modulating_factor = tf.pow((1.0 - p_t), gamma)
+    # if gamma:
+    #     gamma = tf.convert_to_tensor(gamma, dtype=K.floatx())
+    #     modulating_factor = tf.pow((1.0 - p_t), gamma)
 
     # compute the final loss and return
-    return tf.reduce_sum(alpha_factor * modulating_factor * ce, axis=-1)
+    Loss = tf.reduce_mean(alpha_factor * modulating_factor * ce) * 2
+    return Loss
 
 class CustomBinaryAccuracy(MeanMetricWrapper):
 
@@ -225,31 +226,30 @@ def custom_binary_accuracy(y_true, y_pred, threshold=0.5):
 class MeanSquaredErrorVelocity(LossFunctionWrapper):
 
     def __init__(self,
-               reduction=losses_utils.ReductionV2.AUTO,
-               name='mean_squared_error'):
+                reduction=losses_utils.ReductionV2.AUTO,
+                name='mean_squared_error'):
         super().__init__(
             mean_squared_error_velocity, name=name, reduction=reduction)
 
 
 @tf.function
-def mean_squared_error_velocity(y_true, y_pred):
+def mean_squared_error_velocity(y_true, y_pred, epsilon = 1e-08):
 
     y_pred = ops.convert_to_tensor_v2_with_dispatch(y_pred)
     y_true = math_ops.cast(y_true, y_pred.dtype)
 
     # mask error in prediction if note is not played
     y_pred = y_pred[:,:,:,0:1] * y_true[:,:,:,0:1]
+    count_non_zero = tf.math.maximum(tf.math.count_nonzero(y_pred, dtype=tf.dtypes.float32),1) # avoid division by zero
 
-    return K.sum(math_ops.squared_difference(y_pred, y_true[:,:,:,2:3]), axis=-1)
+    #tf.print([y_pred[0,0:88,10,:], y_true[0,0:88,10,2:3],  K.sum(math_ops.squared_difference(y_pred, y_true[:,:,:,2:3]))/ count_non_zero, count_non_zero], summarize=-1)
+    return K.sum(math_ops.squared_difference(y_pred, y_true[:,:,:,2:3]))/count_non_zero + epsilon
 
 @tf.function
 def root_mean_squared_error_velocity_metric(y_true, y_pred):
 
-    error = mean_squared_error_velocity(y_true, y_pred)
-    error_sum = tf.math.reduce_sum(error)
-    error_count =  math_ops.cast(tf.math.count_nonzero(error), error_sum.dtype)
-    error_count = tf.math.maximum(error_count,1) # avoid division by zero
+    mse_velocity = mean_squared_error_velocity(y_true, y_pred)
 
-    return tf.math.sqrt(error_sum/error_count)
+    return tf.math.sqrt(mse_velocity)
 
 

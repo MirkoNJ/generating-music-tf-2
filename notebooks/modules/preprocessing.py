@@ -1,13 +1,13 @@
 import tensorflow as tf
 import numpy as np
-import os
 import modules.batch as batch
+import pdb
 
 num_notes_octave = 12
 Midi_low = 21
 Midi_high = 108
 
-def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
+def inputKernel(input_data, Midi_low=Midi_low, Midi_high=Midi_high):
     """
     Arguments:
         input_data: size = [batch_size x num_notes x num_timesteps x 2] 
@@ -23,10 +23,21 @@ def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
     num_notes = input_data.shape[1]     #  88
     num_timesteps = input_data.shape[2] # 128
 
+    # beat 
+    x_Time = input_data[:,:,:,3] - 1
+    x_beat = tf.stack([x_Time%2,  x_Time//2%2, x_Time//4%2, x_Time//8%2, x_Time//16%2], axis=-1)
+
+    # time signature
+    time_signature = tf.reduce_max(input_data[:,:,:,3:4],  axis=2, keepdims=True)
+    x_time_signature = tf.repeat(time_signature, repeats=[num_timesteps], axis=2)
+    x_time_signature = (x_time_signature - 4) / (24 - 4) # min-max-scale to [0,1]
+
+    input_data = input_data[:,:,:,0:3]
+
     # MIDI note number (only a function of the note index)
     Midi_indices = tf.squeeze(tf.range(start=Midi_low, limit = Midi_high+1, delta=1))
-    Midi_indices = (Midi_indices - Midi_low) / (Midi_high+1- Midi_low) # min-max-scale to [0,1]
-    x_Midi = tf.ones((batch_size, num_timesteps, 1, num_notes))*tf.cast(Midi_indices, dtype=tf.float32)
+    Midi_indices = (Midi_indices - Midi_low) / (Midi_high + 1- Midi_low) # min-max-scale to [0,1]
+    x_Midi = tf.ones((batch_size, num_timesteps, 1, num_notes)) * tf.cast(Midi_indices, dtype=tf.float32)
     x_Midi = tf.transpose(x_Midi, perm=[0,3,1,2]) # shape (16, 88, 128, 1) -> [batch_size, num_notes, num_timesteps, 1]
 
     # part_pitchclass (only a function of the note index)
@@ -36,9 +47,9 @@ def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
     # part_prev_vicinity
     input_flatten = tf.cast(tf.transpose(input_data, perm=[0,2,1,3]), dtype=tf.float32) # remove velocity if defined
     input_flatten = tf.reshape(input_flatten, [batch_size*num_timesteps, num_notes, 3]) # shape (128*16=2048, 88, 3)
-    input_flatten_p = tf.slice(input_flatten, [0,0,0],size=[-1, -1, 1])                 # shape (2048, 88, 1) -> [batch size, width, in channels]
-    input_flatten_a = tf.slice(input_flatten, [0,0,1],size=[-1, -1, 1])                 # shape (2048, 88, 1) -> [batch size, width, in channels]
-    input_flatten_vel = tf.slice(input_flatten, [0,0,2],size=[-1, -1, 1])                 # shape (2048, 88, 1) -> [batch size, width, in channels]
+    input_flatten_p = tf.slice(input_flatten, [0,0,0], size=[-1, -1, 1])                 # shape (2048, 88, 1) -> [batch size, width, in channels]
+    input_flatten_a = tf.slice(input_flatten, [0,0,1], size=[-1, -1, 1])                 # shape (2048, 88, 1) -> [batch size, width, in channels]
+    input_flatten_vel = tf.slice(input_flatten, [0,0,2], size=[-1, -1, 1])               # shape (2048, 88, 1) -> [batch size, width, in channels]
 
 
     # reverse identity kernel
@@ -54,8 +65,8 @@ def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
     
     # concatenate back together and restack such that play-articulate-velocity numbers alternate
     vicinity = tf.stack([vicinity_p, vicinity_a, vicinity_vel], axis=3) # 1 array shape (2048, 88, 25, 3)
-    vicinity = tf.unstack(vicinity, axis=2)               # 25 arrays of shape (2048, 88, 3)
-    vicinity = tf.concat(vicinity, axis=2)                # 1 array shape (2048, 88, 75) 
+    vicinity = tf.unstack(vicinity, axis=2) # 25 arrays of shape (2048, 88, 3)
+    vicinity = tf.concat(vicinity, axis=2) # 1 array shape (2048, 88, 75) 
 
     # reshape by major dimensions, THEN swap axes
     x_vicinity = tf.reshape(vicinity, shape = [batch_size, num_timesteps, num_notes, (num_notes_octave * 2 + 1) * 3]) # shape (16, 128, 88, 75)
@@ -72,11 +83,6 @@ def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
     x_context = tf.reshape(context, shape=[batch_size, num_timesteps, num_notes, num_notes_octave])
     x_context = tf.transpose(x_context, perm=[0,2,1,3])
 
-    # beat (only a function of the time axis index plus the time_init value)
-    Time_indices = tf.range(time_init, num_timesteps + time_init)
-    x_Time = tf.reshape(tf.tile(Time_indices, multiples=[batch_size*num_notes]), shape=[batch_size, num_notes, num_timesteps,1])
-    x_beat = tf.cast(tf.concat([x_Time%2,  x_Time//2%2, x_Time//4%2, x_Time//8%2, (x_Time%3)%2, (x_Time%3)//2%2], axis=-1), dtype=tf.float32) #(x_Time%3)%2, (x_Time%3)//2%2 -> 48th notes per bar instead of 16 -> two more bits necessary
-
     # add the mean velocity of one octave up and one octave down
     velocity_count = tf.cast(tf.math.count_nonzero(tf.math.round(vicinity_p), axis=2, keepdims=True), dtype=tf.float32)
     velocity_sum = tf.math.reduce_sum(vicinity_vel, axis=2, keepdims=True)
@@ -88,7 +94,7 @@ def inputKernel(input_data, Midi_low=21, Midi_high=108, time_init=0):
     x_zero = tf.zeros([batch_size, num_notes, num_timesteps,1])
 
     # final array (input vectors per batch, note and timestep)
-    Note_State_Expand = tf.concat([x_Midi, x_pitch_class, x_vicinity, x_context, x_beat, x_velocity, x_zero], axis=-1)
+    Note_State_Expand = tf.concat([x_Midi, x_pitch_class, x_vicinity, x_context, x_beat, x_time_signature, x_velocity, x_zero], axis=-1)
     
     return Note_State_Expand
 
@@ -98,6 +104,7 @@ def noteRNNInputSummary(x):
     for i in range(13,88):
         if i%3 == 0:
             x[i]=x[i]*127
+    x[105] = x[105] * (24 - 4) + 4 
     x[106] = x[106] * 127
     x= np.round(x)
     x = x.astype(int)
@@ -109,7 +116,8 @@ def noteRNNInputSummary(x):
     res['part_prev_vicinity_same'] = x[49:52]
     res['part_prev_vicinity_higher'] = x[52:88]
     res['part_context'] = x[88:100]
-    res['beat'] = x[100:106]
+    res['beat'] = x[100:105]
+    res['time_signature'] = x[105]
     res['velocity'] = x[106]
     res['zero'] = x[107]
     return res
@@ -131,4 +139,24 @@ def createDataSet(pieces, sample_size, num_timesteps, batch_size = 2):
     dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(batch_size)
 
     return dataset
-    
+
+def createDataSet2(pieces, num_time_steps, batch_size = 2, start_old = 0):
+
+    y, start_out = batch.getPieceBatch2(pieces, batch_size,  num_time_steps, start_old)
+    X = inputKernel(y, Midi_low, Midi_high)
+    X, y = alignXy(X, y)
+    dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(batch_size)
+
+    return dataset, start_out
+
+def getNumberOfBatches(pieces, batch_size):
+    n = 0
+    for k in pieces.keys():
+        start_old = 0
+        piece = pieces[str(k)]
+        sixteenth_index = [b[0][3] for b in  piece]
+        num_time_steps =  max(sixteenth_index)*3*2 + 1
+        while start_old < (len(piece)- num_time_steps):
+            _, start_old = createDataSet2(piece, num_time_steps = num_time_steps, batch_size=batch_size, start_old=start_old)
+            n += 1
+    return n 
