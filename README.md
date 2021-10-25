@@ -33,50 +33,57 @@ generating-music-tf-2
 |   Pipfile.lock   
 │
 └───data
-│   │   chopin_title_opus.csv           <- For mapping .mid files to opus number
-│   │   sources_for_chopin_midi.txt     <- Sources for .mid files
 │   │
-│   └───chopin_midi                     <- All chopin .mid files
+│   └─── < composer_name >                  <- Contains all .mid files used
+|                                              for composer with composer_name
 │   
+└───data_info
+│   chopin_title_opus.csv                   <- A mapping from Opus to Title 
+|                                              of pieces by F. Chopin
+│    
 └───notebooks
-|   │   main.ipynb                      <- Data preperation, training, music generation
-|   │   playground.ipynb                <- Trying out different stuff
+|   │   modelling.ipynb                     <- Preprocessing and Training
+|   │   model_results_visualisation.ipynb   <- Results Analysis
+|   │   music_generation.ipynb              <- Generating new music
+|   │   playground.ipynb                    <- Trying out different stuff
 │   │
 │   └───modules                     
-|       |   batch.py                    <- generating batches for training
-|       |   midi_related.py             <- everything necessary for .mid import/export
-|       |   preprocessing.py            <- transforming note state matrices to inputs
-|       |   subclasses.py               <- custom layers, metrics and loss function
+|       |   batch.py                        <- generating batches
+|       |                                       for training
+|       |   midi_related.py                 <- everything necessary
+|       |                                       for .mid import/export
+|       |   plotting.py                     <- everything necessary 
+|       |                                       for plotting results
+|       |   preprocessing.py                <- transforms note state matrices
+|       |                                       to inputs
+|       |   subclasses.py                   <- custom layers, metrics
+|       |                                       and loss function
 │   
 └───outputs
 │   │
 │   └───midi 
 |   |   |   
-|   |   └───train                       <- .mid files generated during training
-|   |   |   |   model_name_1            
-|   |   |   |   model_name_2             
-|   |   |   |   ...
+|   |   └───train                    <- .mid files generated during training
+|   |   |   |    < model_name >.mid            
 |   |   |   
-|   |   └───generated                   <- .mid files generated after training
-|   |   |   |   model_name_1            
-|   |   |   |   model_name_2             
-|   |   |   |   ...
+|   |   └───generated                <- .mid files generated after training
+|   |   |   |    < model_name >.mid            
+|   |   
+|   |   └───results                  <- Renamed and collected 
+|   |   |   |                           .mid files based on data used for model
+|   |   |   |    < model_name >.mid            
 |   |   
 │   └───models
 |   |   |   
-|   |   └───arrays                      <- numpy arrays saved during training
-|   |   |   |   model_name_1            
-|   |   |   |   model_name_2             
-|   |   |   |   ...
+|   |   └───arrays                   <- numpy arrays saved after training
+|   |   |   |    < model_name >.mid            
 |   |   |   
-|   |   └───ckpt                        <- saved models during and after training
-|   |   |   |   model_name_1            
-|   |   |   |   model_name_2            
-|   |   |   |   ...
+|   |   └───ckpt                     <- saved models during and after training
+|   |   |   |    < model_name >.mid            
 
 ```
 
 ## Using it
 
-Run the ```notebook/main.ipynb ```to train a model and generate new .mid files.
-(A more detailed description of how to customize, will hopefully follow here.)
+Run the ```notebook/modelling.ipynb ```to train a model and save a model.
+Load the saved model in ```notebook/music_generation.ipynb ``` to generate new .mid files.
