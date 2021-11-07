@@ -8,7 +8,6 @@ division_len = 48 # interval between possible start locations -> implies only ne
 def getPieceSegment(pieces, num_time_steps):
     piece_output = random.choice(list(pieces.values()))
     start = random.randrange(0, (len(piece_output) - num_time_steps), division_len)
-
     seg_out = piece_output[start : (start + num_time_steps)]
 
     return seg_out
